@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getMe, getStocks, createStock, updatePrice, buyStock, sellStock } from '../api';
+import { getMe, getStocks, createStock, updatePrice, buyStock, sellStock, deleteStock } from '../api';
 import { useWebSocket } from '../useWebSocket';
 
 export default function Dashboard({ onLogout }) {
@@ -25,12 +25,17 @@ export default function Dashboard({ onLogout }) {
     load();
   }, []);
 
-  const handleWsMessage = useCallback((data) => {
-    if (data.type === 'TICKER_UPDATE') {
-      const { ticker, price } = data.payload;
-      setStocks(prev => prev.map(s => s.ticker === ticker ? { ...s, price } : s));
-    }
-  }, []);
+const handleWsMessage = useCallback((data) => {
+  if (data.type === 'TICKER_UPDATE') {
+    const { ticker, price } = data.payload;
+    setStocks(prev => prev.map(s => s.ticker === ticker ? { ...s, price } : s));
+  }
+  // Добавь это:
+  if (data.type === 'TICKER_DELETED') {
+    const { ticker } = data.payload;
+    setStocks(prev => prev.filter(s => s.ticker !== ticker));
+  }
+}, []);
 
   useWebSocket(handleWsMessage);
 
@@ -99,6 +104,21 @@ export default function Dashboard({ onLogout }) {
     if (data.walletBalance !== undefined) {
       setUser(prev => ({ ...prev, walletBalance: data.walletBalance, portfolio: data.portfolio }));
       flash(`✅ Sold ${shares} share(s) of $${ticker}`);
+    } else {
+      flash('❌ ' + (data.message || 'Error'), 'error');
+    }
+  }
+
+  async function handleDeleteStock() {
+    if (!myStock) return;
+    if (!window.confirm(`Delete $${myStock.ticker}? This cannot be undone.`)) return;
+    setLoading(true);
+    const data = await deleteStock(myStock.ticker);
+    setLoading(false);
+    if (data.message === 'Stock deleted') {
+      setStocks(prev => prev.filter(s => s.ticker !== myStock.ticker));
+      setMyStock(null);
+      flash('✅ Stock deleted');
     } else {
       flash('❌ ' + (data.message || 'Error'), 'error');
     }
@@ -188,6 +208,9 @@ export default function Dashboard({ onLogout }) {
                   </button>
                 </div>
               </form>
+               <button onClick={handleDeleteStock} disabled={loading} style={{width: '100%', padding: '10px', borderRadius: 9, border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: 700, fontSize: 13, cursor: 'pointer', marginTop: 10, border: '1.5px solid #fecaca'}}>
+                  🗑️ Delete Stock
+                </button>
             </div>
           )}
 

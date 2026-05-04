@@ -73,4 +73,28 @@ router.patch('/:ticker/price', auth, async (req, res) => {
   }
 });
 
+router.delete('/:ticker', auth, async (req, res) => {
+  try {
+    const stock = await Stock.findOne({ ticker: req.params.ticker.toUpperCase() });
+    if (!stock) return res.status(404).json({ message: 'Stock not found' });
+
+    if (stock.owner.toString() !== req.user.id)
+      return res.status(403).json({ message: 'Forbidden: not your stock' });
+
+    await Stock.deleteOne({ ticker: req.params.ticker.toUpperCase() });
+
+    const broadcast = req.app.locals.broadcast;
+    if (broadcast) {
+      broadcast({
+        type: 'TICKER_DELETED',
+        payload: { ticker: stock.ticker }
+      });
+    }
+
+    res.json({ message: 'Stock deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

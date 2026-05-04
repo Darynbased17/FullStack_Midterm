@@ -74,3 +74,11 @@ export async function sellStock(ticker, shares) {
   });
   return r.json();
 }
+
+export async function deleteStock(ticker) {
+  const r = await fetch(`${BASE}/api/stocks/${ticker}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  return r.json();
+}
